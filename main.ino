@@ -10,23 +10,27 @@
 
 SoftwareSerial myPort;
 
-SolarPosition Toronto(26.050425, -98.260485); //latitud y longitud
+unsigned long Epoch_Time;
 
+SolarPosition ReynosaUT(26.050425, -98.260485); //latitud y longitud
+
+const uint8_t digits = 3;
+
+unsigned long degree_unit = 76.444444444444;
+
+SolarPosition_t savedPosition;
 
 const char* ssid = "INFINITUM7EDE_2.4";
 const char* password =  "3KU99ZC64q";
 
 const char* ntpServer = "pool.ntp.org";
-const long  gmtOffset_sec = -21600;
+const long  gmtOffset_sec = 0;
 const int   daylightOffset_sec = 3600;
-
-
-
 
 short int httpResponseCode;
 String url;
 String httpRequestData, payload;
-String ServerIP = "";
+
 
 void setup() {
 
@@ -34,6 +38,8 @@ void setup() {
 
   pinMode(MYPORT_RX, INPUT);
   pinMode(MYPORT_TX, OUTPUT);
+
+  setTime(SECS_YR_2000);
 
   myPort.begin(19200, SWSERIAL_8N1, MYPORT_RX, MYPORT_TX, false);
   if (!myPort) { // If the object did not initialize, then its configuration is invalid
@@ -59,12 +65,19 @@ void setup() {
   printLocalTime();
 
   //disconnect WiFi as it's no longer needed
-  WiFi.disconnect(true);
-  WiFi.mode(WIFI_OFF);
 
-  SolarPosition::setTimeProvider(getNtpTime);
+
+  SolarPosition::setTimeProvider(getTime);
+
+  // myPort.write(0xC2); //Motor One Forward
+  // myPort.write(127);
+  // delay(180*degree_unit);
+  // myPort.write(0xC0); //Motor One Forward
+  // myPort.write(127);
+
   
 }
+
 
 void Connect(){
   WiFi.begin(ssid, password);
@@ -76,91 +89,50 @@ void Connect(){
   
 }
 
-void POST(String var_name, float value)
-{
-  HTTPClient http;
-  http.addHeader("Content-Type", "text/plain");
-  url = "http://"+(String)ServerIP+"/POST?"+(String)var_name+"="+String(value);
-  http.begin(url.c_str());
-  httpResponseCode = http.POST("");
-  delay(300);
-  if (httpResponseCode > 0) {
-    Serial.print("HTTP Response code: ");
-    Serial.println(httpResponseCode);
-  }
-  http.end();
-}
-
-
-String GET(String var_name){
-  HTTPClient http;
-
-  url = "http://"+(String)ServerIP+"/GET?"+(String)var_name;
-  http.begin(url.c_str());
-  httpResponseCode = http.GET();
-  delay(300);
-  if (httpResponseCode > 0) {
-    Serial.print("HTTP Response code: ");
-    Serial.println(httpResponseCode);
-    return http.getString();
-  }
-  return "Null";
-  http.end();
-}
-
 void printLocalTime(){
   struct tm timeinfo;
-  if(!getLocalTime(&timeinfo)){
-    Serial.println("Failed to obtain time");
-    return;
-  }
-  Serial.println(&timeinfo, "%A, %B %d %Y %H:%M:%S");
-  Serial.print("Day of week: ");
-  Serial.println(&timeinfo, "%A");
-  Serial.print("Month: ");
-  Serial.println(&timeinfo, "%B");
-  Serial.print("Day of Month: ");
-  Serial.println(&timeinfo, "%d");
-  Serial.print("Year: ");
-  Serial.println(&timeinfo, "%Y");
-  Serial.print("Hour: ");
-  Serial.println(&timeinfo, "%H");
-  Serial.print("Hour (12 hour format): ");
-  Serial.println(&timeinfo, "%I");
-  Serial.print("Minute: ");
-  Serial.println(&timeinfo, "%M");
-  Serial.print("Second: ");
-  Serial.println(&timeinfo, "%S");
-
-  Serial.println("Time variables");
-  char timeHour[3];
-  strftime(timeHour,3, "%H", &timeinfo);
-  Serial.println(timeHour);
-  char timeWeekDay[10];
-  strftime(timeWeekDay,10, "%A", &timeinfo);
-  Serial.println(timeWeekDay);
-  Serial.println();
+  printSolarPosition(ReynosaUT.getSolarPosition(), digits);
 }
 
-time_t getNtpTime()
+void printSolarPosition(SolarPosition_t pos, int numDigits)
 {
-  struct tm timeinfo;
-  return mktime(&timeinfo);
+  Serial.print(F("el: "));
+  Serial.print(pos.elevation, numDigits);
+  Serial.print(F(" deg\t"));
+
+  Serial.print(F("az: "));
+  Serial.print(pos.azimuth, numDigits);
+  Serial.println(F(" deg"));
 }
 
 
 void loop() {
-go();
+
+}
+
+
+time_t getTime() {
+  time_t now;
+  struct tm timeinfo;
+  if (!getLocalTime(&timeinfo)) {
+    //Serial.println("Failed to obtain time");
+    return(0);
+  }
+  time(&now);
+  return now;
 }
 
 void go()
 {
 
   delay(1000);
+  Epoch_Time = getTime();
+  Serial.print("Epoch Time: ");
+  Serial.println(Epoch_Time);
   printLocalTime();
-      // myPort.write(0xC2); //Motor One Forward
-      // myPort.write(127);
-      // delay(100);
-      // myPort.write(0xCA); //Motor two Forward    
-      // myPort.write(127);
+  myPort.write(0xC2); //Motor One Forward
+  myPort.write(127);
+  delay(100);
+  // myPort.write(0xCA); //Motor two Forward    
+  // myPort.write(127);
 }
